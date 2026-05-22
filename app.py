@@ -4,6 +4,7 @@ Simple AI Answer Evaluation System
 
 import sys
 from pathlib import Path
+import importlib.util
 
 ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
@@ -11,12 +12,43 @@ if str(ROOT_DIR) not in sys.path:
 
 import streamlit as st
 import pandas as pd
-from modules.nlp_engine import (
-    evaluate_student, compute_student_summary,
-    extract_text, parse_qa_from_text, parse_student_answers
-)
-from modules import db_handler as db
-from modules.sample_data import get_sample_questions, get_sample_key_answers, get_sample_student_answers
+
+try:
+    from modules.nlp_engine import (
+        evaluate_student, compute_student_summary,
+        extract_text, parse_qa_from_text, parse_student_answers
+    )
+    from modules import db_handler as db
+    from modules.sample_data import get_sample_questions, get_sample_key_answers, get_sample_student_answers
+except ModuleNotFoundError:
+    # Fallback for environments where the root package path is not set correctly.
+    nlp_path = ROOT_DIR / "modules" / "nlp_engine.py"
+    db_path = ROOT_DIR / "modules" / "db_handler.py"
+    sample_data_path = ROOT_DIR / "modules" / "sample_data.py"
+
+    def load_module(name, path):
+        spec = importlib.util.spec_from_file_location(name, str(path))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    if not nlp_path.exists() or not db_path.exists() or not sample_data_path.exists():
+        raise
+
+    module_nlp = load_module("modules.nlp_engine", nlp_path)
+    module_db = load_module("modules.db_handler", db_path)
+    module_sample = load_module("modules.sample_data", sample_data_path)
+
+    evaluate_student = module_nlp.evaluate_student
+    compute_student_summary = module_nlp.compute_student_summary
+    extract_text = module_nlp.extract_text
+    parse_qa_from_text = module_nlp.parse_qa_from_text
+    parse_student_answers = module_nlp.parse_student_answers
+
+    db = module_db
+    get_sample_questions = module_sample.get_sample_questions
+    get_sample_key_answers = module_sample.get_sample_key_answers
+    get_sample_student_answers = module_sample.get_sample_student_answers
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
